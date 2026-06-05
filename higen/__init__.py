@@ -14,8 +14,8 @@ The system uses a hierarchical RL strategy:
 3. Rewards guide agents toward finding more compiler bugs
 """
 
-from .config import CompilerFuzzConfig
-from .env import CompilerFuzzEnv
+from .higen.config import CompilerFuzzConfig
+from .higen.env import CompilerFuzzEnv
 
 __all__ = ["CompilerFuzzConfig", "CompilerFuzzEnv"]
 

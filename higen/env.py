@@ -20,7 +20,7 @@ import numpy as np
 
 from .config import CompilerFuzzConfig, DimensionPoolConfig
 from .reward import LowerMetrics, UpperMetrics, compute_lower_reward, compute_upper_reward
-from .utils.testing import GenerationParams, run_generation_and_test
+from .higen.utils.testing import GenerationParams, run_generation_and_test
 
 
 METHODS = ["symbolic", "symbolic-cinit", "concolic", "single-io"]
