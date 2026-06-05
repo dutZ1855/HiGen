@@ -1,21 +1,23 @@
 # HiGen
 
-> A hierarchical generation framework for deep learning compiler testing.
+> A hierarchical reinforcement learning-based testing framework for deep learning compilers.
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Ubuntu%2022.04-lightgrey)
 ![Backend](https://img.shields.io/badge/Backends-ORT%20%7C%20TVM%20%7C%20OpenVINO-green)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-HiGen is a hierarchical generation framework for deep learning compiler testing. It adopts a two-level architecture consisting of **dimension selection** and **configuration generation**, and leverages NNSmith to generate ONNX models for compiler fuzzing and differential testing.
+In this study, we propose HiGen, a novel testing framework based on hierarchical reinforcement learning, to hierarchically configure neural network generators for detecting bugs in deep learning compilers.
 
-The current prototype implements the core execution workflow, reward calculation, backend validation, bug case collection, coverage measurement, crash deduplication, and triage utilities. It is designed to support subsequent extension and replacement of reinforcement learning policies.
+HiGen integrates neural network generation, backend validation, differential testing, reward calculation, bug case collection, coverage measurement, crash deduplication, and triage utilities. It is designed to improve the effectiveness of deep learning compiler testing by guiding neural network generation toward bug-prone compiler behaviors.
 
 ## Table of Contents
 
 * [Overview](#overview)
+* [Tested Environment](#tested-environment)
 * [External Dependencies](#external-dependencies)
 * [Environment Setup](#environment-setup)
+* [Backend Installation](#backend-installation)
 * [Quick Start](#quick-start)
 * [Project Structure](#project-structure)
 * [Testing Modes](#testing-modes)
@@ -28,6 +30,7 @@ The current prototype implements the core execution workflow, reward calculation
 * [Bug Triage](#bug-triage)
 * [Version Control Notes](#version-control-notes)
 * [Notes](#notes)
+
 
 ## Overview
 
@@ -66,21 +69,66 @@ Supported backends:
 | OpenVINO     | Compiler/runtime testing and coverage measurement |
 | PyTorch      | Oracle/reference backend in normal testing mode   |
 
+## Tested Environment
+
+HiGen was mainly evaluated on the following Linux environment.
+
+| Component        | Version / Configuration                                     |
+| ---------------- | ----------------------------------------------------------- |
+| Operating System | Ubuntu 22.04.4 LTS                                          |
+| CPU              | 13th Gen Intel(R) Core(TM) i9-13900K, 32 logical processors |
+| GPU              | NVIDIA GPU                                                  |
+| Memory           | 128.0 GiB                                                   |
+| Python           | Python 3.11                                                 |
+| Conda            | Anaconda / Miniconda                                        |
+| TVM              | 0.23.0dev, nightly/development build                        |
+| OpenVINO         | 2026.0.0.dev20251223, nightly/development build             |
+| ONNX Runtime     | Installed through `requirements.txt`                        |
+| NNSmith          | Included in this repository under `nnsmith-main/`           |
+| Coverage Tool    | `gcovr`                                                     |
+
+To record the exact environment on your machine, run:
+
+```bash
+lsb_release -a
+uname -a
+
+python --version
+gcc --version
+g++ --version
+cmake --version
+
+python -c "import onnx; print('onnx', onnx.__version__)"
+python -c "import onnxruntime as ort; print('onnxruntime', ort.__version__)"
+python -c "import tvm; print('tvm', tvm.__version__)"
+python -c "import openvino as ov; print('openvino', ov.__version__)"
+python -c "import gcovr; print('gcovr', gcovr.__version__)"
+```
+
+If TVM or OpenVINO is built from source, we recommend recording the corresponding commit IDs:
+
+```bash
+git -C /path/to/tvm rev-parse HEAD
+git -C /path/to/openvino rev-parse HEAD
+```
+
 ## External Dependencies
 
-This repository does **not** include the source code or instrumented builds of NNSmith, TVM, or OpenVINO. Users need to prepare these components separately according to their own system environment.
+This repository includes the NNSmith source code used by HiGen for neural network generation. However, it does **not** include the source code or instrumented builds of TVM or OpenVINO. Users need to prepare TVM and OpenVINO separately according to their own system environment and selected testing mode.
 
-| Component             | Required For                                       | Provided by This Repository |
-| --------------------- | -------------------------------------------------- | --------------------------- |
-| NNSmith               | ONNX model generation                              | No                          |
-| TVM                   | TVM testing and TVM differential testing           | No                          |
-| OpenVINO              | OpenVINO testing and OpenVINO differential testing | No                          |
-| Instrumented TVM      | TVM coverage measurement                           | No                          |
-| Instrumented OpenVINO | OpenVINO coverage measurement                      | No                          |
+| Component             | Required For                                       | Provided by This Repository     |
+| --------------------- | -------------------------------------------------- | ------------------------------- |
+| NNSmith               | ONNX model generation                              | Yes                             |
+| ONNX Runtime          | ORT testing and differential testing               | Installed by `requirements.txt` |
+| TVM                   | TVM testing and TVM differential testing           | No                              |
+| OpenVINO              | OpenVINO testing and OpenVINO differential testing | No                              |
+| Instrumented TVM      | TVM coverage measurement                           | No                              |
+| Instrumented OpenVINO | OpenVINO coverage measurement                      | No                              |
+| gcovr                 | Coverage collection                                | Installed by `requirements.txt` |
 
 ### NNSmith
 
-HiGen relies on NNSmith for ONNX model generation. Please install NNSmith or place a local copy under:
+HiGen relies on NNSmith for ONNX model generation. The NNSmith source code used by HiGen is included in this repository under:
 
 ```text
 nnsmith-main/
@@ -92,54 +140,130 @@ The default configuration assumes that the NNSmith directory is located at:
 HiGen/nnsmith-main/
 ```
 
-If your NNSmith path is different, please modify the corresponding path configuration in `config.py`.
+If you move NNSmith to a different location, please modify the corresponding path configuration in:
+
+```text
+higen/config.py
+```
+
+### ONNX Runtime
+
+ONNX Runtime is required for the default testing mode and differential testing. It is installed through:
+
+```bash
+pip install -r requirements.txt
+```
+
+Verify ONNX Runtime:
+
+```bash
+python -c "import onnxruntime as ort; print(ort.__version__)"
+```
 
 ### TVM
 
-TVM is required when running TVM-based testing or TVM-related differential testing.
+TVM is required when running:
 
-For normal TVM testing, please make sure TVM is correctly installed and can be imported in the current Python environment.
-
-For TVM coverage measurement, an instrumented TVM build is required. The repository does not provide this build. Users should build TVM with coverage instrumentation by themselves and configure the corresponding library path, for example:
-
-```bash
-export TVM_LIBRARY_PATH=/path/to/tvm/build_gcov
+```text
+--compiler tvm
 ```
+
+or when using TVM in differential testing:
+
+```text
+--diff-backends "ort,ov,tvm"
+```
+
+If you only run ONNX Runtime testing, TVM is not required.
 
 ### OpenVINO
 
-OpenVINO is required when running OpenVINO-based testing or OpenVINO-related differential testing.
-
-For normal OpenVINO testing, please make sure OpenVINO is correctly installed and can be imported in the current Python environment.
-
-For OpenVINO coverage measurement, a source-built OpenVINO version with coverage instrumentation is required. The repository does not provide this build. Users must explicitly provide the OpenVINO source and build directories when enabling coverage measurement:
+OpenVINO is required when running:
 
 ```text
---ov-cov-src /path/to/openvino/source
---ov-cov-build /path/to/openvino/build_gcov
+--compiler ov
 ```
+
+or when using OpenVINO in differential testing:
+
+```text
+--diff-backends "ort,ov,tvm"
+```
+
+If you only run ONNX Runtime testing, OpenVINO is not required.
 
 ## Environment Setup
 
-This project provides `environment.yml` and `requirements.txt` for environment reproduction.
+### 1. Clone HiGen
 
 ```bash
 git clone https://github.com/dutZ1855/HiGen.git
 cd HiGen
+```
 
+### 2. Create the Conda Environment
+
+```bash
 conda env create -f environment.yml
 conda activate higen
+```
+
+### 3. Install Python Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-Verify the installation:
+### 4. Install the Bundled NNSmith Source
+
+If NNSmith is not automatically visible in the environment, install the bundled NNSmith source in editable mode:
+
+```bash
+pip install -e ./nnsmith-main
+```
+
+Verify NNSmith:
 
 ```bash
 python -c "import nnsmith; print('nnsmith installed')"
-python -c "import onnxruntime; print(onnxruntime.__version__)"
-python -c "import tvm; print(tvm.__version__)"
-python -c "import openvino; print('openvino installed')"
 ```
+
+### 5. Verify Basic Dependencies
+
+```bash
+python -c "import onnx; print('onnx', onnx.__version__)"
+python -c "import onnxruntime as ort; print('onnxruntime', ort.__version__)"
+python -c "import numpy as np; print('numpy', np.__version__)"
+python -c "import torch; print('torch', torch.__version__)"
+```
+
+For TVM and OpenVINO testing, also verify:
+
+```bash
+python -c "import tvm; print('tvm', tvm.__version__); print(tvm.__file__)"
+python -c "import openvino as ov; print('openvino', ov.__version__); print(ov.__file__)"
+```
+
+
+## Backend Installation
+
+Detailed TVM/OpenVINO installation instructions, including source builds and coverage-instrumented builds, are provided in:
+
+```text
+doc/BACKEND_INSTALLATION.md
+```
+
+This separate guide covers:
+
+* TVM installation from pip
+* TVM source build
+* TVM coverage-instrumented build
+* OpenVINO installation from pip
+* OpenVINO source build
+* OpenVINO coverage-instrumented build
+* `gcovr`-based coverage export
+
+For strict reproducibility, please record the exact TVM/OpenVINO versions or commit IDs used in your environment.
 
 ## Quick Start
 
@@ -148,7 +272,7 @@ Run the following commands from the repository root.
 ### ONNX Runtime Testing
 
 ```bash
-python -m rl_compiler_fuzz.main \
+python -m higen.main \
   --big-epochs 20 \
   --small-epochs 100 \
   --compiler ort
@@ -163,7 +287,7 @@ ORT CPU  vs  ORT GPU  vs  PyTorch
 ### TVM Testing
 
 ```bash
-python -m rl_compiler_fuzz.main \
+python -m higen.main \
   --big-epochs 20 \
   --small-epochs 100 \
   --compiler tvm \
@@ -179,7 +303,7 @@ TVM CPU  vs  TVM GPU  vs  PyTorch
 ### OpenVINO Testing
 
 ```bash
-python -m rl_compiler_fuzz.main \
+python -m higen.main \
   --big-epochs 20 \
   --small-epochs 100 \
   --compiler ov
@@ -193,17 +317,19 @@ OpenVINO CPU  vs  OpenVINO GPU  vs  PyTorch
 
 ## Project Structure
 
-| File / Directory            | Description                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `config.py`                 | Manages dimension pools, hyperparameters, paths, and global configurations.                                        |
-| `reward.py`                 | Implements high-level and low-level reward functions, including vulnerability, validity, and diversity rewards.    |
-| `utils/testing.py`          | Encapsulates the workflow from parameter configuration to NNSmith model generation and backend validation.         |
-| `utils/filter.py`           | Provides crash-case deduplication based on normalized error signatures.                                            |
-| `utils/triage_bug_cases.py` | Provides utilities for triaging and prioritizing reported bug cases.                                               |
-| `env.py`                    | Implements `CompilerFuzzEnv`, exposes `step_small_epoch` and `step_big_epoch`, and maintains diversity statistics. |
-| `agents.py`                 | Provides PPO-based dimension selection and SAC-based configuration generation agents implemented with PyTorch.     |
-| `main.py`                   | Main training and testing entry point.                                                                             |
-| `README.md`                 | Project documentation.                                                                                             |
+| File / Directory                  | Description                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `higen/config.py`                 | Manages dimension pools, hyperparameters, paths, and global configurations.                                        |
+| `higen/reward.py`                 | Implements high-level and low-level reward functions, including vulnerability, validity, and diversity rewards.    |
+| `higen/utils/testing.py`          | Encapsulates the workflow from parameter configuration to NNSmith model generation and backend validation.         |
+| `higen/utils/filter.py`           | Provides crash-case deduplication based on normalized error signatures.                                            |
+| `higen/utils/triage_bug_cases.py` | Provides utilities for triaging and prioritizing reported bug cases.                                               |
+| `higen/env.py`                    | Implements `CompilerFuzzEnv`, exposes `step_small_epoch` and `step_big_epoch`, and maintains diversity statistics. |
+| `higen/agents.py`                 | Provides PPO-based dimension selection and SAC-based configuration generation agents implemented with PyTorch.     |
+| `higen/main.py`                   | Main training and testing entry point.                                                                             |
+| `nnsmith-main/`                   | NNSmith source code used for ONNX model generation.                                                                |
+| `docs/BACKEND_INSTALLATION.md`    | TVM/OpenVINO installation and coverage build guide.                                                                |
+| `README.md`                       | Project documentation.                                                                                             |
 
 ## Testing Modes
 
@@ -228,7 +354,7 @@ Differential testing mode is enabled when `--diff-backends` is specified.
 Example:
 
 ```bash
-python -m rl_compiler_fuzz.main \
+python -m higen.main \
   --big-epochs 20 \
   --small-epochs 100 \
   --compiler ort \
@@ -252,39 +378,40 @@ When `--diff-backends` is specified, HiGen enters differential testing mode and 
 
 ## Coverage Measurement
 
-HiGen supports runtime coverage collection for TVM and OpenVINO using `gcovr`. Coverage statistics are periodically written to:
+HiGen supports runtime coverage collection for TVM and OpenVINO using `gcovr`. To reproduce coverage results, TVM and OpenVINO must be compiled with coverage instrumentation flags.
+
+For detailed coverage build instructions, please refer to:
+
+```text
+docs/BACKEND_INSTALLATION.md
+```
+
+The coverage output is periodically written to:
 
 ```text
 coverage_by_steps.csv
 ```
 
-This file can be used to plot coverage curves during fuzzing.
+The coverage file can be used to plot coverage curves during fuzzing.
 
-### TVM Coverage
+### Coverage Dependencies
 
-TVM coverage requires an instrumented TVM build. The repository does not provide the instrumented TVM build. Please build TVM with coverage support by yourself and specify the corresponding build directory according to your local environment.
-
-Example:
+Install `gcovr`:
 
 ```bash
-export TVM_LIBRARY_PATH=/path/to/tvm/build_gcov
+pip install gcovr==8.6
 ```
 
-### OpenVINO Coverage
-
-OpenVINO coverage requires a source-built OpenVINO version with coverage instrumentation enabled. The repository does not provide the instrumented OpenVINO build.
-
-Users must explicitly provide the OpenVINO source directory and build directory when enabling OpenVINO coverage:
-
-```text
---ov-cov-src /path/to/openvino/source
---ov-cov-build /path/to/openvino/build_gcov
-```
-
-### Coverage Example
+Verify `gcovr`:
 
 ```bash
-python -m rl_compiler_fuzz.main \
+gcovr --version
+```
+
+### Coverage Collection Example
+
+```bash
+python -m higen.main \
   --big-epochs 50 \
   --small-epochs 200 \
   --compiler ort \
@@ -292,8 +419,30 @@ python -m rl_compiler_fuzz.main \
   --diff-backends "tvm,ov,ort" \
   --cov-reset --cov-every 50 \
   --ov-cov-reset --ov-cov-every 50 \
-  --ov-cov-src /path/to/openvino/source \
+  --ov-cov-src /path/to/openvino \
   --ov-cov-build /path/to/openvino/build_gcov
+```
+
+### Manual Coverage Export
+
+After a run, users can manually export coverage with `gcovr`.
+
+For TVM:
+
+```bash
+gcovr \
+  -r /path/to/tvm \
+  --object-directory /path/to/tvm/build_gcov \
+  --csv tvm_coverage.csv
+```
+
+For OpenVINO:
+
+```bash
+gcovr \
+  -r /path/to/openvino \
+  --object-directory /path/to/openvino/build_gcov \
+  --csv openvino_coverage.csv
 ```
 
 ## Output Organization
@@ -419,7 +568,7 @@ Not every reported mismatch represents a true compiler bug. Some differences may
 HiGen provides a triage utility:
 
 ```bash
-python -m rl_compiler_fuzz.utils.triage_bug_cases \
+python -m higen.utils.triage_bug_cases \
   --cases-root /path/to/bug_cases \
   --out-json triage.json \
   --top 30
@@ -441,7 +590,7 @@ The output is a prioritized list of bug candidates.
 View only crash-like cases:
 
 ```bash
-python -m rl_compiler_fuzz.utils.triage_bug_cases \
+python -m higen.utils.triage_bug_cases \
   --cases-root /path/to/rl_runs_diff_tvm_ort_ov/bug_cases \
   --only-crashes \
   --top 50
@@ -450,7 +599,7 @@ python -m rl_compiler_fuzz.utils.triage_bug_cases \
 Exclude known submitted operators:
 
 ```bash
-python -m rl_compiler_fuzz.utils.triage_bug_cases \
+python -m higen.utils.triage_bug_cases \
   --cases-root /path/to/rl_runs_diff_tvm_ort_ov/bug_cases \
   --exclude-ops "Acos,Asin,Atan" \
   --top 50
@@ -459,7 +608,7 @@ python -m rl_compiler_fuzz.utils.triage_bug_cases \
 Exclude infrastructure or unstable mismatch types:
 
 ```bash
-python -m rl_compiler_fuzz.utils.triage_bug_cases \
+python -m higen.utils.triage_bug_cases \
   --cases-root /path/to/rl_runs_diff_tvm_ort_ov/bug_cases \
   --exclude-error-types "output_name_mismatch,nan_location_mismatch,inf_location_mismatch" \
   --top 50
@@ -496,9 +645,12 @@ triage*.json
 
 ## Notes
 
-* The project is tested mainly on Linux.
-* This repository does not include NNSmith, TVM source code, or OpenVINO source code.
-* Users need to install NNSmith, TVM, and OpenVINO according to their local environment and selected testing mode.
+* The project is tested mainly on Ubuntu 22.04.4 LTS.
+* This repository includes the NNSmith source code used by HiGen.
+* This repository does not include TVM source code, OpenVINO source code, or their instrumented builds.
+* HiGen was tested with TVM `0.23.0dev` and OpenVINO `2026.0.0.dev20251223`, both of which are development/nightly-style builds.
+* Detailed TVM/OpenVINO installation and coverage build instructions are provided in `docs/BACKEND_INSTALLATION.md`.
+* Users need to install TVM and OpenVINO according to their local environment and selected testing mode.
 * For GPU execution, make sure CUDA, cuDNN, and related backend libraries are correctly installed.
 * For TVM and OpenVINO coverage collection, source-built instrumented versions are required.
 * OpenVINO coverage requires users to explicitly provide `--ov-cov-src` and `--ov-cov-build`.
