@@ -1,0 +1,36 @@
+name: HiGen
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pip
+
+  # Build tools
+  - cmake>=3.24
+  - ninja
+  - git
+
+  # LLVM / compiler toolchain
+  - llvmdev>=15
+  - llvm-tools
+  - gcc_linux-64
+  - gxx_linux-64
+  - libstdcxx-devel_linux-64
+  - sysroot_linux-64
+
+  # Graph / visualization dependencies
+  - graphviz
+  - pygraphviz
+
+  # XML dependencies
+  - libxml2
+  - libxml2-devel
+
+  # Test dependencies
+  - pytest
+
+  # CUDA / cuDNN
+  - cudnn
