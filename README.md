@@ -204,14 +204,14 @@ cd HiGen
 ### 2. Create the Conda Environment
 
 ```bash
-conda env create -f environment.yml
+conda env create -f doc/environment.yml
 conda activate higen
 ```
 
 ### 3. Install Python Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r doc/requirements.txt
 ```
 
 ### 4. Install the Bundled NNSmith Source
