@@ -214,21 +214,7 @@ conda activate higen
 pip install -r doc/requirements.txt
 ```
 
-### 4. Install the Bundled NNSmith Source
-
-If NNSmith is not automatically visible in the environment, install the bundled NNSmith source in editable mode:
-
-```bash
-pip install -e ./nnsmith-main
-```
-
-Verify NNSmith:
-
-```bash
-python -c "import nnsmith; print('nnsmith installed')"
-```
-
-### 5. Verify Basic Dependencies
+### 4. Verify Basic Dependencies
 
 ```bash
 python -c "import onnx; print('onnx', onnx.__version__)"
